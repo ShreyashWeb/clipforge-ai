@@ -8,6 +8,7 @@ import { PipelineVisualizer } from '../components/PipelineVisualizer.jsx';
 import { SectionTitle } from '../components/SectionTitle.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { StoryboardCarousel } from '../components/StoryboardCarousel.jsx';
+import { JobDetailSkeleton } from '../components/Skeleton.jsx';
 
 const activeStatuses = new Set(['INTERVIEW', 'ANGLE_APPROVAL', 'SCRIPT', 'STORYBOARD_APPROVAL', 'RENDER', 'FINAL_APPROVAL']);
 
@@ -58,7 +59,7 @@ export function JobDetail() {
   return (
     <section className="mx-auto max-w-7xl space-y-8 px-5 py-10 md:px-10">
       <Link className="inline-block text-sm text-neon-cyan" to="/jobs">← Back to jobs</Link>
-      <AsyncState loading={state.loading} error={state.error}>
+      <AsyncState loading={state.loading} error={state.error} skeleton={<JobDetailSkeleton />}>
         {state.job && (
           <>
             <SectionTitle

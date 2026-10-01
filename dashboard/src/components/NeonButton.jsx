@@ -13,7 +13,7 @@ export const NeonButton = forwardRef(function NeonButton(
     <button
       ref={ref}
       type={type}
-      className={`inline-flex items-center justify-center rounded-lg border bg-black/20 px-4 py-2 text-sm font-semibold tracking-wide transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50 ${toneClasses} ${className}`}
+      className={`neon-button inline-flex items-center justify-center rounded-lg border bg-black/20 px-4 py-2 text-sm font-semibold tracking-wide transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50 ${toneClasses} ${className}`}
       {...props}
     >
       {children}
