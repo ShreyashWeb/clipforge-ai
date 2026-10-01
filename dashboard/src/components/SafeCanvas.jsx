@@ -15,6 +15,11 @@ function supportsWebGL() {
   } catch {
     return false;
   }
+
+  function prefersReducedMotion() {
+    return typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  }
 }
 
 class CanvasErrorBoundary extends Component {
@@ -57,7 +62,7 @@ function VisibilityAwareCanvas({ children, ...props }) {
  * @returns {import('react').ReactNode}
  */
 export function SafeCanvas({ children, fallback = null, ...props }) {
-  if (!supportsWebGL()) return fallback;
+  if (!supportsWebGL() || prefersReducedMotion()) return fallback;
 
   return (
     <CanvasErrorBoundary fallback={fallback}>

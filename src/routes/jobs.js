@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Job } from '../models/Job.js';
 import { JOB_STATUSES, transition } from '../pipeline/stateMachine.js';
+import { replayDemoJob } from '../pipeline/demoReplay.js';
+import { jobLogger } from '../utils/logger.js';
 
 const idSchema = z.string().min(1);
 const gateSchema = z.object({ gate: z.string().min(1) }).strict();
@@ -106,6 +108,8 @@ export function createJobsRouter({ model = Job, triggerNextStep = async () => {}
           : JOB_STATUSES.REJECTED;
 
       transition(job.status, nextStatus);
+      const log = jobLogger(job, { operation: 'approval', gate, decision });
+      log.info('approval_started', { status: job.status });
       job.approvals.push({ gate, decision, at: new Date() });
       job.status = nextStatus;
       await job.save();
@@ -113,6 +117,7 @@ export function createJobsRouter({ model = Job, triggerNextStep = async () => {}
       if (decision === 'approved') {
         await triggerNextStep(job);
       }
+      log.info('approval_completed', { status: job.status });
 
       return response.json({ job: serializeJob(job) });
     } catch (error) {
@@ -141,10 +146,19 @@ export function createJobsRouter({ model = Job, triggerNextStep = async () => {}
         return errorResponse(response, 400, 'INVALID_RETRY', 'Only failed jobs can be retried');
       }
 
+      const log = jobLogger(job, { operation: 'retry' });
+      log.info('job_retry_started', { status: job.status });
+      if (process.env.DEMO_MODE === 'true') {
+        const replayed = await replayDemoJob(job);
+        log.info('job_retry_completed', { status: replayed.status, source: 'demo-cache' });
+        return response.json({ job: serializeJob(replayed) });
+      }
+
       const retryStatus = getRetryStatus(job);
       job.status = retryStatus;
       await job.save();
       await triggerNextStep(job);
+      log.info('job_retry_completed', { status: job.status });
       return response.json({ job: serializeJob(job) });
     } catch (error) {
       next(error);

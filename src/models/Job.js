@@ -96,6 +96,10 @@ const jobSchema = new mongoose.Schema(
       type: [approvalSchema],
       default: [],
     },
+    pipeline: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true },
 );
