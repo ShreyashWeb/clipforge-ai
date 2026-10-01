@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "start": "node src/start.js",
+    "check-env": "node src/utils/checkEnv.js",
     "seed": "node src/utils/seed.js",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@octokit/rest": "^22.0.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

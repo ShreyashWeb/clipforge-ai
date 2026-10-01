@@ -9,7 +9,7 @@ export function createApiRouter(options = {}) {
   const { authMiddleware = requireAuth } = options;
   router.use(
     cors({
-      origin: process.env.DASHBOARD_URL || 'http://localhost:5173',
+      origin: process.env.DASHBOARD_ORIGIN || process.env.DASHBOARD_URL || 'http://localhost:5173',
     }),
   );
   router.use(createAuthRouter({ ...options, authMiddleware }));

@@ -14,7 +14,7 @@ const interviewSchema = z.object({
   angles: z.array(z.string().min(1)).length(3),
 });
 
-const defaultLlm = {
+export const defaultLlm = {
   async generate(prompt) {
     const endpoint = process.env.LLM_API_URL;
     const apiKey = process.env.LLM_API_KEY;

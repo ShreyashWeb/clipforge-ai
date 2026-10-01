@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: clipforge-api
+    runtime: node
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TELEGRAM_MODE
+        value: webhook
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_API_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: FLUX_API_KEY
+        sync: false
+      - key: FLUX_API_URL
+        value: https://api.bfl.ml/v1/flux-pro-1.1
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_DEFAULT_VOICE_ID
+        value: 21m00Tcm4TlvDq8ikWAM
+      - key: ELEVENLABS_MODEL_ID
+        value: eleven_multilingual_v2
+      - key: CREATOMATE_API_KEY
+        sync: false
+      - key: CREATOMATE_API_URL
+        value: https://api.creatomate.com/v2
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REDIRECT_URI
+        sync: false
+      - key: YOUTUBE_REFRESH_TOKEN
+        sync: false
+      - key: DASHBOARD_ORIGIN
+        sync: false

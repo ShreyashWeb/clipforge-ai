@@ -63,6 +63,10 @@ const jobSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    githubSummary: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     sources: {
       type: [mongoose.Schema.Types.Mixed],
       default: [],
