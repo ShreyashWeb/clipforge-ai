@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #070709;
+  --color-ink-900: #0d0d12;
+  --color-ink-800: #171720;
+  --color-neon-red: #ff365e;
+  --color-neon-cyan: #32e6ff;
+  --color-muted: #8d8d9d;
+  --font-sans: "Inter", "Segoe UI", sans-serif;
+}
+
+:root {
+  color: #f7f7fb;
+  background: #070709;
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 10% 0%, rgb(255 54 94 / 0.12), transparent 30rem),
+    radial-gradient(circle at 90% 15%, rgb(50 230 255 / 0.1), transparent 28rem),
+    var(--color-ink-950);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero-section {
+  min-height: calc(100vh - 73px);
+}
+
+.hero-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.hero-scene canvas {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.hero-scene::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(90deg, var(--color-ink-950) 0%, transparent 55%, rgb(7 7 9 / 0.35) 100%);
+  pointer-events: none;
+}
+
+.hero-orb-fallback {
+  position: absolute;
+  top: 50%;
+  left: 72%;
+  width: min(48vw, 32rem);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle at 35% 30%, rgb(50 230 255 / 0.95), transparent 12%),
+    radial-gradient(circle at 65% 70%, rgb(255 54 94 / 0.85), transparent 35%),
+    radial-gradient(circle, rgb(50 230 255 / 0.2), transparent 68%);
+  filter: blur(1px);
+  box-shadow: 0 0 80px rgb(50 230 255 / 0.22), 0 0 140px rgb(255 54 94 / 0.16);
+  animation: hero-orb-pulse 4s ease-in-out infinite;
+}
+
+@keyframes hero-orb-pulse {
+  0%,
+  100% { transform: translate(-50%, -50%) scale(0.96); }
+  50% { transform: translate(-50%, -50%) scale(1.04); }
+}
+
+.pipeline-label {
+  display: block;
+  width: 5.5rem;
+  color: #8d8d9d;
+  font-size: 0.65rem;
+  line-height: 1rem;
+  text-align: center;
+  white-space: normal;
+}
+
+.pipeline-label-complete,
+.pipeline-label-active {
+  color: #32e6ff;
+}
+
+.pipeline-label-failed {
+  color: #ff365e;
+}
+
+@media (max-width: 768px) {
+  .hero-orb-fallback {
+    top: 58%;
+    left: 65%;
+    width: 75vw;
+    opacity: 0.55;
+  }
+}
