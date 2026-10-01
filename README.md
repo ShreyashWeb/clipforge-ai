@@ -58,12 +58,15 @@ ClipForge AI turns a topic, GitHub repository, pull request, or release into a s
 | `DASHBOARD_URL` | Local/dashboard URL fallback for CORS. |
 | `DEMO_USER` | Enables the fixed demo identity when `true`. |
 | `DEMO_USER_ID` | ID used for the demo identity. |
+| `DEMO_MODE` | Replays cached research, storyboard images, narration audio, and final video without external paid API calls. |
 | `VITE_API_URL` | Dashboard build-time backend origin; never put secrets here. |
 | `VITE_DEMO_MODE` | Dashboard build-time mock-data switch. |
 | `VITE_BASE_PATH` | Optional Vite base path; defaults to `/clipforge-ai/`. |
 | `RENDER_EXTERNAL_URL` | Render-provided public service URL used to derive the Telegram webhook. |
 
 Only `VITE_*` values are sent to the dashboard bundle. Never place API keys, OAuth secrets, or tokens in dashboard environment variables.
+
+When `DEMO_MODE=true`, Telegram `/start <topic>` and `/api/jobs/:id/retry` use recorded research, image, audio, and video fixtures without calling paid providers. This is intended for demos and incident recovery. Completed pipeline results are stored under each job's `pipeline` field so retries can reuse work safely.
 
 ## Deployment
 

@@ -10,6 +10,8 @@ services:
         value: production
       - key: TELEGRAM_MODE
         value: webhook
+      - key: DEMO_MODE
+        value: "false"
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET

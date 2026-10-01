@@ -6,6 +6,7 @@ import { createInterviewPlan, defaultLlm, recordInterviewAnswer } from '../pipel
 import { generateScript } from '../pipeline/script.js';
 import { researchTopic } from '../services/research.js';
 import { explainGitHubChange, parseGitHubUrl, researchGitHub } from '../services/github.js';
+import { replayDemoJob } from '../pipeline/demoReplay.js';
 import { generateSceneImage, generateStoryboardImages } from '../services/imageGen.js';
 import { uploadApprovedVideo } from '../services/youtube.js';
 import { approvalKeyboard, storyboardKeyboard } from './keyboards.js';
@@ -70,6 +71,11 @@ export function createBot({
       topic,
       sourceType: isGitHub ? 'github' : 'topic',
     });
+    if (process.env.DEMO_MODE === 'true') {
+      await replayDemoJob(job);
+      await ctx.reply(`Demo replay complete: ${job.topic}\n\n${job.videoUrl}`);
+      return;
+    }
     const plan = await createInterviewPlan(job.topic, {
       research: isGitHub ? githubResearch : research,
       llm,

@@ -112,6 +112,22 @@ describe('job routes', () => {
     expect(triggerNextStep).toHaveBeenCalledWith(job);
   });
 
+  it('replays a failed job from cached media in demo mode', async () => {
+    const previousDemoMode = process.env.DEMO_MODE;
+    process.env.DEMO_MODE = 'true';
+    job = createJob({ status: 'FAILED' });
+    const { app, triggerNextStep } = createApp(modelFor(job));
+    const response = await request(app).post('/api/jobs/job-1/retry');
+    if (previousDemoMode === undefined) delete process.env.DEMO_MODE;
+    else process.env.DEMO_MODE = previousDemoMode;
+
+    expect(response.status).toBe(200);
+    expect(job.status).toBe('PUBLISHED');
+    expect(job.audioUrl).toContain('clipforge-demo');
+    expect(job.videoUrl).toContain('clipforge-demo');
+    expect(triggerNextStep).not.toHaveBeenCalled();
+  });
+
   it('returns aggregate stats', async () => {
     const published = createJob({ status: 'PUBLISHED' });
     const { app } = createApp({
