@@ -1,6 +1,7 @@
 const statusStyles = {
   INTERVIEW: 'border-violet-400/40 bg-violet-400/10 text-violet-200',
   ANGLE_APPROVAL: 'border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan',
+  SCRIPT: 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200',
   STORYBOARD_APPROVAL: 'border-amber-300/40 bg-amber-300/10 text-amber-200',
   RENDER: 'border-blue-400/40 bg-blue-400/10 text-blue-200',
   FINAL_APPROVAL: 'border-orange-300/40 bg-orange-300/10 text-orange-200',
@@ -10,13 +11,14 @@ const statusStyles = {
 };
 
 export function StatusBadge({ status }) {
+  const safeStatus = status || 'UNKNOWN';
   return (
     <span
       className={`inline-flex rounded-full border px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${
-        statusStyles[status] || statusStyles.REJECTED
+        statusStyles[safeStatus] || statusStyles.REJECTED
       }`}
     >
-      {status.replaceAll('_', ' ')}
+      {String(safeStatus).replaceAll('_', ' ')}
     </span>
   );
 }

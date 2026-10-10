@@ -1,5 +1,20 @@
 import mongoose from 'mongoose';
 
+const inputSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ['text', 'voice', 'image'],
+      required: true,
+    },
+    ref: {
+      type: String,
+      default: null,
+    },
+  },
+  { _id: false },
+);
+
 const approvalSchema = new mongoose.Schema(
   {
     gate: {
@@ -13,6 +28,63 @@ const approvalSchema = new mongoose.Schema(
     at: {
       type: Date,
       required: true,
+      default: Date.now,
+    },
+  },
+  { _id: false },
+);
+
+const traceSchema = new mongoose.Schema(
+  {
+    step: {
+      type: String,
+      required: true,
+    },
+    tool: {
+      type: String,
+      default: null,
+    },
+    ms: {
+      type: Number,
+      default: 0,
+    },
+    ok: {
+      type: Boolean,
+      default: true,
+    },
+    at: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+  },
+  { _id: false },
+);
+
+const scriptSceneSchema = new mongoose.Schema(
+  {
+    scene: {
+      type: Number,
+    },
+    sceneNo: {
+      type: Number,
+    },
+    narration: {
+      type: String,
+    },
+    text: {
+      type: String,
+    },
+    visualPrompt: {
+      type: String,
+    },
+    sourceIds: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    supported: {
+      type: Boolean,
+      default: true,
     },
   },
   { _id: false },
@@ -30,10 +102,14 @@ const jobSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    inputs: {
+      type: [inputSchema],
+      default: [],
+    },
     sourceType: {
       type: String,
       enum: ['topic', 'github'],
-      required: true,
+      default: 'topic',
     },
     status: {
       type: String,
@@ -45,6 +121,7 @@ const jobSchema = new mongoose.Schema(
         'RENDER',
         'FINAL_APPROVAL',
         'PUBLISHED',
+        'DELIVERED',
         'REJECTED',
         'FAILED',
       ],
@@ -54,6 +131,10 @@ const jobSchema = new mongoose.Schema(
     interviewAnswers: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
+    },
+    angle: {
+      type: String,
+      default: null,
     },
     selectedAngle: {
       type: String,
@@ -79,6 +160,10 @@ const jobSchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.Mixed],
       default: [],
     },
+    audio: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     audioUrl: {
       type: String,
       default: null,
@@ -94,6 +179,10 @@ const jobSchema = new mongoose.Schema(
     },
     approvals: {
       type: [approvalSchema],
+      default: [],
+    },
+    trace: {
+      type: [traceSchema],
       default: [],
     },
     pipeline: {

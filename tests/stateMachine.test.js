@@ -6,7 +6,23 @@ import {
 } from '../src/pipeline/stateMachine.js';
 
 describe('job state machine', () => {
-  it('allows the approved production path', () => {
+  it('allows the approved production path through DELIVERED', () => {
+    const path = [
+      JOB_STATUSES.INTERVIEW,
+      JOB_STATUSES.ANGLE_APPROVAL,
+      JOB_STATUSES.SCRIPT,
+      JOB_STATUSES.STORYBOARD_APPROVAL,
+      JOB_STATUSES.RENDER,
+      JOB_STATUSES.FINAL_APPROVAL,
+      JOB_STATUSES.DELIVERED,
+    ];
+
+    for (let index = 0; index < path.length - 1; index += 1) {
+      expect(transition(path[index], path[index + 1])).toBe(path[index + 1]);
+    }
+  });
+
+  it('allows the approved production path through PUBLISHED', () => {
     const path = [
       JOB_STATUSES.INTERVIEW,
       JOB_STATUSES.ANGLE_APPROVAL,
@@ -24,10 +40,15 @@ describe('job state machine', () => {
 
   it.each([
     [JOB_STATUSES.INTERVIEW, JOB_STATUSES.SCRIPT],
+    [JOB_STATUSES.INTERVIEW, JOB_STATUSES.RENDER],
+    [JOB_STATUSES.INTERVIEW, JOB_STATUSES.FINAL_APPROVAL],
     [JOB_STATUSES.SCRIPT, JOB_STATUSES.RENDER],
+    [JOB_STATUSES.STORYBOARD_APPROVAL, JOB_STATUSES.PUBLISHED],
+    [JOB_STATUSES.DELIVERED, JOB_STATUSES.INTERVIEW],
     [JOB_STATUSES.PUBLISHED, JOB_STATUSES.INTERVIEW],
     [JOB_STATUSES.FAILED, JOB_STATUSES.INTERVIEW],
-  ])('rejects invalid transition %s -> %s', (currentStatus, nextStatus) => {
+    [JOB_STATUSES.REJECTED, JOB_STATUSES.SCRIPT],
+  ])('rejects invalid transition %s -> %s and throws error', (currentStatus, nextStatus) => {
     expect(canTransition(currentStatus, nextStatus)).toBe(false);
     expect(() => transition(currentStatus, nextStatus)).toThrow(/Invalid job transition/);
   });
@@ -36,6 +57,14 @@ describe('job state machine', () => {
     expect(transition(JOB_STATUSES.ANGLE_APPROVAL, JOB_STATUSES.REJECTED)).toBe(
       JOB_STATUSES.REJECTED,
     );
-    expect(transition(JOB_STATUSES.RENDER, JOB_STATUSES.FAILED)).toBe(JOB_STATUSES.FAILED);
+    expect(transition(JOB_STATUSES.STORYBOARD_APPROVAL, JOB_STATUSES.REJECTED)).toBe(
+      JOB_STATUSES.REJECTED,
+    );
+    expect(transition(JOB_STATUSES.FINAL_APPROVAL, JOB_STATUSES.REJECTED)).toBe(
+      JOB_STATUSES.REJECTED,
+    );
+    expect(transition(JOB_STATUSES.RENDER, JOB_STATUSES.FAILED)).toBe(
+      JOB_STATUSES.FAILED,
+    );
   });
 });

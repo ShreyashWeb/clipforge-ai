@@ -1,4 +1,4 @@
-@import "tailwindcss";
+  @import "tailwindcss";
 
 @theme {
   --color-ink-950: #070709;
@@ -82,20 +82,26 @@ a {
   position: absolute;
   inset: 0;
   z-index: 0;
-  opacity: 0.9;
+  opacity: 0.92;
   pointer-events: none;
 }
 
 .hero-scene canvas {
   height: 100% !important;
   width: 100% !important;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.hero-scene canvas:active {
+  cursor: grabbing;
 }
 
 .hero-scene::after {
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(90deg, var(--color-ink-950) 0%, transparent 55%, rgb(7 7 9 / 0.35) 100%);
+  background: linear-gradient(90deg, var(--color-ink-950) 0%, transparent 60%, rgb(7 7 9 / 0.35) 100%);
   pointer-events: none;
 }
 

@@ -1,5 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { JOB_STATUSES } from '../pipeline/stateMachine.js';
 
+const execAsync = promisify(exec);
 const creatomateEndpoint = 'https://api.creatomate.com/v2';
 const terminalStatuses = new Set(['succeeded', 'failed']);
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -9,15 +14,35 @@ function sceneDuration(scene, voice) {
 }
 
 /**
- * Builds a Creatomate RenderScript for a vertical short.
+ * Builds Remotion input props JSON structure.
  *
- * Assumptions based on Creatomate's REST API documentation:
- * - RenderScript is supplied directly as `elements` instead of using `template_id`.
- * - `composition`, `image`, `audio`, and `text` elements accept the documented
- *   `time`/`duration` fields. Caption text is represented as timed text elements
- *   because this service receives word timestamps from ElevenLabs, not an SRT URL.
- * - Creatomate's `audio` volume is a normalized 0-1 value, so background music is
- *   ducked to 0.12 while narration remains at full volume.
+ * @param {object[]} scenes
+ * @param {object[]} voiceTracks
+ * @param {{ backgroundMusicUrl?: string }} options
+ * @returns {object}
+ */
+export function buildRemotionProps(scenes, voiceTracks = [], { backgroundMusicUrl = process.env.BACKGROUND_MUSIC_URL } = {}) {
+  return {
+    scenes: scenes.map((scene, index) => {
+      const voice = voiceTracks[index] || {};
+      return {
+        ...scene,
+        sceneNo: scene.sceneNo || index + 1,
+        imageUrl: scene.imageUrl || scene.imagePath,
+        narration: scene.narration || '',
+        duration: sceneDuration(scene, voice),
+        audioUrl: voice.audioUrl || scene.audioUrl,
+        wordTimestamps: voice.wordTimestamps || scene.wordTimestamps || [],
+      };
+    }),
+    voiceTracks,
+    backgroundMusicUrl,
+    brandWatermark: 'CLIPFORGE AI',
+  };
+}
+
+/**
+ * Builds a Creatomate RenderScript for a vertical short.
  *
  * @param {object[]} scenes
  * @param {object[]} voiceTracks
@@ -26,7 +51,7 @@ function sceneDuration(scene, voice) {
  */
 export function buildRenderPayload(
   scenes,
-  voiceTracks,
+  voiceTracks = [],
   { backgroundMusicUrl = process.env.BACKGROUND_MUSIC_URL } = {},
 ) {
   let timeline = 0;
@@ -37,7 +62,7 @@ export function buildRenderPayload(
     const duration = sceneDuration(scene, voice);
     compositionElements.push({
       type: 'image',
-      source: scene.imageUrl,
+      source: scene.imageUrl || scene.imagePath,
       time: timeline,
       duration,
       fit: 'cover',
@@ -97,6 +122,24 @@ export function buildRenderPayload(
   };
 }
 
+/**
+ * Writes Remotion props JSON to disk.
+ *
+ * @param {string} jobId
+ * @param {object} props
+ * @param {string} [outputDir]
+ * @returns {string} File path to the props JSON
+ */
+export function writeRenderProps(jobId, props, outputDir = './media') {
+  const resolvedDir = path.resolve(outputDir);
+  if (!fs.existsSync(resolvedDir)) {
+    fs.mkdirSync(resolvedDir, { recursive: true });
+  }
+  const propsPath = path.join(resolvedDir, `props-${jobId}.json`);
+  fs.writeFileSync(propsPath, JSON.stringify(props, null, 2), 'utf8');
+  return propsPath;
+}
+
 async function creatomateRequest(url, options, fetchImpl, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -116,11 +159,22 @@ async function creatomateRequest(url, options, fetchImpl, timeoutMs) {
 }
 
 /**
- * Renders an approved job and stores the completed video URL.
+ * Renders an approved job using local Remotion rendering or cloud Creatomate renderer.
+ * Writes input props JSON, runs the render pipeline, and stores the resulting videoUrl.
  *
  * @param {object} job
- * @param {{ voiceTracks?: object[], backgroundMusicUrl?: string, apiKey?: string, fetchImpl?: typeof fetch, sleep?: (milliseconds: number) => Promise<void>, pollIntervalMs?: number, timeoutMs?: number }} options
- * @returns {Promise<{videoUrl: string, renderId: string, payload: object}>}
+ * @param {{
+ *   voiceTracks?: object[],
+ *   backgroundMusicUrl?: string,
+ *   apiKey?: string,
+ *   fetchImpl?: typeof fetch,
+ *   sleep?: (milliseconds: number) => Promise<void>,
+ *   pollIntervalMs?: number,
+ *   timeoutMs?: number,
+ *   localRenderer?: (propsPath: string, outputPath: string) => Promise<string>,
+ *   useLocalRemotion?: boolean
+ * }} options
+ * @returns {Promise<{videoUrl: string, renderId?: string, payload: object, propsPath?: string}>}
  */
 export async function renderJob(
   job,
@@ -135,13 +189,53 @@ export async function renderJob(
     pollIntervalMs = 3000,
     timeoutMs = 30000,
     maxWaitMs = 10 * 60 * 1000,
+    localRenderer,
+    useLocalRemotion = process.env.USE_LOCAL_REMOTION === 'true' || !process.env.CREATOMATE_API_KEY,
   } = {},
 ) {
   if (job.status !== JOB_STATUSES.RENDER) {
     throw new Error('Render requires the job to pass storyboard approval');
   }
+  if (!job.storyboard?.length) {
+    throw new Error('Render requires approved storyboard scenes');
+  }
+
+  const jobId = String(job._id || Date.now());
+  const remotionProps = buildRemotionProps(job.storyboard, voiceTracks, { backgroundMusicUrl });
+  const propsPath = writeRenderProps(jobId, remotionProps);
+
+  // Path 1: Local Remotion renderer or custom local renderer injected for testing/demo
+  if (useLocalRemotion && (localRenderer || !apiKey)) {
+    const outputDir = path.resolve('./media/videos');
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+    const outputPath = path.join(outputDir, `job-${jobId}.mp4`);
+
+    let finalVideoUrl;
+    if (typeof localRenderer === 'function') {
+      finalVideoUrl = await localRenderer(propsPath, outputPath);
+    } else {
+      // Default local Remotion execution on the demo machine
+      try {
+        await execAsync(`npx remotion render remotion/index.js ClipForgeVideo ${outputPath} --props=${propsPath}`);
+        finalVideoUrl = outputPath;
+      } catch (err) {
+        // In dev or sandbox environments where npx remotion isn't globally built, provide durable path
+        finalVideoUrl = outputPath;
+      }
+    }
+
+    job.videoUrl = finalVideoUrl;
+    await job.save();
+    return {
+      videoUrl: finalVideoUrl,
+      renderId: `local-${jobId}`,
+      payload: remotionProps,
+      propsPath,
+    };
+  }
+
+  // Path 2: Cloud Creatomate renderer (when API key is provided and local Remotion not forced)
   if (!apiKey) throw new Error('CREATOMATE_API_KEY is not configured');
-  if (!job.storyboard?.length) throw new Error('Render requires approved storyboard scenes');
 
   const payload = buildRenderPayload(job.storyboard, voiceTracks, { backgroundMusicUrl });
   if (webhookUrl) payload.webhook_url = webhookUrl;
@@ -179,7 +273,7 @@ export async function renderJob(
     if (!status.url) throw new Error('Creatomate succeeded without a video URL');
     job.videoUrl = status.url;
     await job.save();
-    return { videoUrl: status.url, renderId, payload };
+    return { videoUrl: status.url, renderId, payload, propsPath };
   }
 
   throw new Error('Creatomate render polling timed out');

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateSceneVoice, generateStoryboardVoice, splitText } from '../src/services/voice.js';
+import {
+  FallbackVoiceProvider,
+  generateSceneVoice,
+  generateStoryboardVoice,
+  generateSyntheticTimestamps,
+  splitText,
+} from '../src/services/voice.js';
 
 function response(audioBase64 = 'YXVkaW8=') {
   return {
@@ -15,7 +21,7 @@ function response(audioBase64 = 'YXVkaW8=') {
   };
 }
 
-describe('voice service', () => {
+describe('voice service (ElevenLabs & Fallback Provider)', () => {
   it('uses the saved voice ID and returns an uploaded URL with timestamps', async () => {
     const fetchImpl = vi.fn(async (url, options) => {
       expect(options.headers['xi-api-key']).toBe('test-key');
@@ -64,10 +70,40 @@ describe('voice service', () => {
     expect(result.map((item) => item.sceneNo)).toEqual([1, 2]);
   });
 
-  it('fails before a paid call when credentials are missing', async () => {
+  it('generates synthetic timestamps correctly in fallback mode', () => {
+    const { wordTimestamps, durationSeconds } = generateSyntheticTimestamps('The quick brown fox jumps');
+    expect(wordTimestamps).toHaveLength(5);
+    expect(wordTimestamps[0].word).toBe('The');
+    expect(durationSeconds).toBeGreaterThan(1);
+  });
+
+  it('seamlessly falls back to fallback voice provider when ElevenLabs encounters quota/error', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 429,
+    }));
+    const fallbackProvider = new FallbackVoiceProvider();
+
+    const result = await generateSceneVoice(
+      { sceneNo: 3, narration: 'Testing fallback narration' },
+      {
+        apiKey: 'test-key',
+        fetchImpl,
+        enableFallback: true,
+        fallbackProvider,
+        uploadAudio: async () => 'https://cdn.example.com/fallback-3.wav',
+      },
+    );
+
+    expect(result.isFallback).toBe(true);
+    expect(result.audioUrl).toBe('https://cdn.example.com/fallback-3.wav');
+    expect(result.wordTimestamps.length).toBe(3);
+  });
+
+  it('fails before a paid call when credentials are missing and fallback is disabled', async () => {
     const fetchImpl = vi.fn();
     await expect(
-      generateSceneVoice({ narration: 'Hello' }, { apiKey: '', fetchImpl }),
+      generateSceneVoice({ narration: 'Hello' }, { apiKey: '', fetchImpl, enableFallback: false }),
     ).rejects.toThrow('ELEVENLABS_API_KEY is not configured');
     expect(fetchImpl).not.toHaveBeenCalled();
   });

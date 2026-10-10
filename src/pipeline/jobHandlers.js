@@ -1,30 +1,21 @@
-import { JOB_STATUSES, transition } from './stateMachine.js';
-
-const approvalNextStatus = {
-  ANGLE_APPROVAL: JOB_STATUSES.SCRIPT,
-  STORYBOARD_APPROVAL: JOB_STATUSES.RENDER,
-  FINAL_APPROVAL: JOB_STATUSES.PUBLISHED,
-};
+import { JOB_STATUSES } from './stateMachine.js';
+import { applyJobDecision } from '../services/jobs.js';
 
 /**
  * Records an approval and advances a job to its next pipeline state.
+ * Delegates to the unified applyJobDecision service function.
  *
  * @param {object} job
- * @param {'approved'|'rejected'} decision
+ * @param {'approved'|'rejected'|'approve'|'reject'} decision
+ * @param {object} [options]
  * @returns {Promise<object>}
  */
-export async function handleApproval(job, decision) {
-  const nextStatus =
-    decision === 'approved' ? approvalNextStatus[job.status] : JOB_STATUSES.REJECTED;
-  if (!nextStatus) {
-    throw new Error(`Job is not awaiting approval: ${job.status}`);
-  }
-
-  transition(job.status, nextStatus);
-  job.approvals.push({ gate: job.status, decision, at: new Date() });
-  job.status = nextStatus;
-  await job.save();
-  return job;
+export async function handleApproval(job, decision, options = {}) {
+  return applyJobDecision(job, {
+    gate: job.status,
+    decision,
+    ...options,
+  });
 }
 
 /**

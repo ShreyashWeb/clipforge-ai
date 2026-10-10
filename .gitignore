@@ -2,3 +2,8 @@ node_modules/
 dashboard/node_modules/
 dashboard/dist/
 .env
+.env.*
+dashboard/.env
+dashboard/.env.*
+media/
+scratch/

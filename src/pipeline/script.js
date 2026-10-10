@@ -1,58 +1,24 @@
 import { z } from 'zod';
+import { defaultLlm as fallbackLlm } from '../services/llm.js';
 
 const sceneSchema = z.object({
   sceneNo: z.number().int().positive(),
   narration: z.string().min(1),
   visualPrompt: z.string().min(1),
   sourceIds: z.array(z.string().min(1)).min(1),
+  supported: z.boolean().optional(),
 });
 
 const scriptSchema = z.object({ scenes: z.array(sceneSchema).min(1) });
+
 const checkSchema = z.object({
   line: z.number().int().positive(),
   supported: z.boolean(),
+  quote: z.string().optional(),
   reason: z.string().min(1),
 });
+
 const verificationSchema = z.object({ checks: z.array(checkSchema) });
-
-const defaultLlm = {
-  async generate(prompt) {
-    const endpoint = process.env.LLM_API_URL;
-    const apiKey = process.env.LLM_API_KEY;
-    if (!endpoint || !apiKey) throw new Error('LLM_API_URL and LLM_API_KEY are required');
-    let lastError;
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: process.env.LLM_MODEL,
-            temperature: 0.3,
-            response_format: { type: 'json_object' },
-            messages: [{ role: 'user', content: prompt }],
-          }),
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error(`LLM request failed with status ${response.status}`);
-        const payload = await response.json();
-        return payload.choices?.[0]?.message?.content || payload.output_text;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-    throw new Error(`Script generation failed: ${lastError.message}`);
-  },
-};
 
 function parseJson(content) {
   const text = typeof content === 'string' ? content : JSON.stringify(content);
@@ -64,7 +30,7 @@ function sourceContext(sources) {
   return sources
     .map(
       (source, index) =>
-        `[${source.id || index + 1}] ${source.title}\nURL: ${source.url}\nSnippet: ${source.snippet}`,
+        `[${source.id || index + 1}] ${source.title}\nURL: ${source.url}\nSnippet: ${source.snippet || source.content || ''}`,
     )
     .join('\n\n');
 }
@@ -107,15 +73,52 @@ ${sourceContext(sources)}`;
 function verificationPrompt(topic, script, sources) {
   return `Audit each narration line in this script about "${topic}" against only the
 cited source snippets. Return JSON only:
-{"checks":[{"line":1,"supported":true,"reason":"..."}]}.
-Use one check per scene. Mark supported false if any factual claim is not entailed
-by the cited snippets. Explain the exact missing or contradicted evidence.
+{"checks":[{"line":1,"supported":true,"quote":"direct quote from snippet","reason":"..."}]}.
+Use one check per scene. If supported is true, you MUST provide an exact verbatim quote from the cited snippet.
+Mark supported false if any claim is not entailed by the cited snippet or if no direct quote exists.
 
 SCRIPT:
 ${JSON.stringify(script)}
 
 SOURCES:
 ${sourceContext(sources)}`;
+}
+
+/**
+ * Validates that cited quotes actually exist in the research source snippets.
+ *
+ * @param {Array<object>} checks
+ * @param {Array<object>} scenes
+ * @param {Array<object>} sources
+ * @returns {Array<object>}
+ */
+function verifyQuotesAgainstSources(checks, scenes, sources) {
+  return checks.map((check) => {
+    const scene = scenes.find((s) => s.sceneNo === check.line) || scenes[check.line - 1];
+    if (!scene) return check;
+
+    // If check claims supported and provided a quote, verify it appears in at least one cited snippet
+    if (check.supported && check.quote && check.quote.trim().length > 3) {
+      const citedSources = sources.filter((s, idx) =>
+        scene.sourceIds.includes(String(s.id || idx + 1)),
+      );
+      const quoteText = check.quote.trim().toLowerCase();
+      const quoteAppearsInSnippet = citedSources.some((s) => {
+        const snippet = (s.snippet || s.content || '').toLowerCase();
+        return snippet.includes(quoteText);
+      });
+
+      if (!quoteAppearsInSnippet && citedSources.length > 0) {
+        return {
+          ...check,
+          supported: false,
+          reason: `Verification quote "${check.quote}" does not appear in the cited source snippet.`,
+        };
+      }
+    }
+
+    return check;
+  });
 }
 
 /**
@@ -128,7 +131,7 @@ ${sourceContext(sources)}`;
  */
 export async function generateScript(
   topic,
-  { sources, llm = defaultLlm, angle = '' } = {},
+  { sources, llm = fallbackLlm, angle = '' } = {},
 ) {
   if (!Array.isArray(sources) || sources.length === 0) {
     throw new Error('Script generation requires research sources');
@@ -143,9 +146,10 @@ export async function generateScript(
   }
 
   let script = initial;
-  let checks = verificationSchema
+  const rawChecks = verificationSchema
     .parse(parseJson(await llm.generate(verificationPrompt(topic, script, sources))))
     .checks;
+  let checks = verifyQuotesAgainstSources(rawChecks, script.scenes, sources);
   let unsupported = checks.filter((check) => !check.supported);
 
   if (unsupported.length) {
@@ -165,14 +169,24 @@ export async function generateScript(
       throw new Error('Regenerated script is not between 30 and 45 seconds');
     }
     script = repaired;
-    checks = verificationSchema
+    const reChecked = verificationSchema
       .parse(parseJson(await llm.generate(verificationPrompt(topic, script, sources))))
       .checks;
+    checks = verifyQuotesAgainstSources(reChecked, script.scenes, sources);
     unsupported = checks.filter((check) => !check.supported);
   }
 
+  // Attach supported flag to each scene
+  const scenesWithFlags = script.scenes.map((scene) => {
+    const check = checks.find((c) => c.line === scene.sceneNo);
+    return {
+      ...scene,
+      supported: check ? check.supported : true,
+    };
+  });
+
   return {
-    scenes: script.scenes,
+    scenes: scenesWithFlags,
     checks,
     unsupportedLines: unsupported,
     durationSeconds: estimatedSeconds(script),
